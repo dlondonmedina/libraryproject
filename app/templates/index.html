@@ -1,9 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Hello World!</h1>
-<ul>
-    {% for item in items %}
-    <li>{{ item }}</li>
-    {% endfor %}
-</ul>
+<h1>Hi, {{ current_user.username }}!</h1>
+<p><a href="{{ url_for('login') }}">Login</a> to continue to the catalog! or <a href="{{ url_for('register') }}">Register</a>.</p>
 {% endblock %}
