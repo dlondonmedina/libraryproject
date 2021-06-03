@@ -1,28 +1,27 @@
+from app.errors import CannotCheckInError, ItemUnvailableError
 from flask import render_template, flash, redirect, url_for, request
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from app.forms import LoginForm, RegistrationForm
-from app.models import User
+from app.models import User, Book
 from app import app, db
 
 @app.route("/")
-@app.route("/index")
+@app.route("/index/")
 def index():
     page = "Index"
-    items = [
-        "Cavalier King Charles Spaniel",
-        "German Shepherd",
-        "Alaskan Malamute",
-    ]
-    return render_template("index.html", page=page, items=items)
-@app.route("/register", methods=['GET', 'POST'])
+
+    return render_template("index.html", page=page)
+
+
+@app.route("/register/", methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.useranme.data, email=form.email.data)
+        user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -31,7 +30,8 @@ def register():
 
     return render_template('register.html', page='Register', form=form) 
 
-@app.route("/login", methods=['GET', 'POST'])
+
+@app.route("/login/", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -45,12 +45,44 @@ def login():
         next_page = request.args.get('next')
         if not next_page or url_parse(next_page).netloc != '':
             next_page = url_for('index')
-
+        next_page = next_page.replace("/", "")
         return redirect(url_for(next_page))
     
     return render_template('login.html', page='Sign In', form=form)
 
-@app.route("/logout")
+
+@app.route("/logout/")
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/books/')
+@app.route('/books/<id>', methods=['GET', 'POST'])
+@login_required
+def books(id=None):
+    if id is None:
+        books = Book.query.order_by(Book.title)
+        return render_template('booklist.html', page='Books', books = books)
+    
+    book = Book.query.filter_by(id=id).first_or_404()
+    
+    if request.method == 'POST':
+        if request.form.get('action') == 'Check Out':
+            try:
+                book.checkout(current_user)
+                flash('Book Checked Out')
+            except ItemUnvailableError:
+                flash('Book not available')
+            
+        elif request.form.get('action') == 'Check In':
+            try:
+                book.checkin(current_user)
+                flash('Book Checked in.')
+            except CannotCheckInError:
+                flash('Item cannot be checked in.')
+        
+        return redirect(url_for('books'))
+
+    return render_template('bookdetail.html', page=book.title, book=book)
+
+

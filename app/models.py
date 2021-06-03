@@ -1,6 +1,8 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import db, login
+from app import errors
+from app.errors import ItemUnvailableError, CannotCheckInError
 
 loans = db.Table('loans',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
@@ -11,7 +13,7 @@ loans = db.Table('loans',
 def load_user(id):
     return User.query.get(int(id))
 
-    
+
 class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
@@ -41,16 +43,21 @@ class Book(db.Model):
     def __repr__(self):
         return '<Book {}>'.format(self.title)
 
-    def checked_out(self):
-        return self.borrowers
+    def available(self):
+        return self.borrowers == []
     
     def checkout(self, user):
-        if not self.checked_out():
-            self.borrowers.append(user)
+        if not self.available():
+            raise ItemUnvailableError
         
-    
+        self.borrowers.append(user)
+        db.session.commit()
+             
     def checkin(self, user):
-        if user in self.borrowers:
-            self.borrowers.remove(user)
+        if self.available() or user not in self.borrowers:
+            raise CannotCheckInError
+           
+        self.borrowers.remove(user)
+        db.session.commit()
     
     
